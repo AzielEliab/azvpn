@@ -20,6 +20,18 @@ describe("onion circuits", () => {
     assert.equal(circuitStatus(circuit).shape, "entry → middle → exit");
     assert.equal(circuitStatus(circuit).honesty, "REAL");
     assert.match(circuitStatus(circuit).note, /SLOT/);
+    assert.equal(circuitStatus(circuit).cell_padded, true);
+    assert.equal(circuitStatus(circuit).cell_size, 512);
+  });
+
+  it("pads short payloads to a fixed cell so sizes match", () => {
+    const circuit = buildCircuit(defaultRelayRoster(), "onion");
+    const a = wrapOnion(circuit, utf8("a"));
+    const b = wrapOnion(circuit, utf8("bb"));
+    assert.equal(a.length, b.length);
+    assert.equal(fromUtf8(transit(circuit, a).plaintext), "a");
+    assert.equal(fromUtf8(transit(circuit, b).plaintext), "bb");
+    assert.match(circuitStatus(circuit).note, /not origin-hiding/i);
   });
 
   it("builds rendezvous shape without claiming public Tor", () => {

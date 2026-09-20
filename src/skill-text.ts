@@ -14,7 +14,8 @@ export function skillMarkdown(): string {
   return `---
 name: ${NAME}
 description: >-
-  Standalone HTTP/WS lab concentrator with in-process onion circuits. Not TLS.
+  Standalone HTTP/WS lab concentrator with optional Node TLS terminate
+  and in-process onion circuits. HTTPS REAL only when TLS terminates.
   Author ${AUTHOR}.
 ---
 
@@ -45,7 +46,11 @@ ${STUB_OPS.map((op) => `- \`${op}\``).join("\n")}
 npx tsx src/cli.ts health
 npx tsx src/cli.ts open --peer alice --mode onion
 npx tsx src/cli.ts serve
+npx tsx src/cli.ts cert --dir ./lab-tls
+npx tsx src/cli.ts serve --tls --tls-cert ./lab-tls/cert.pem --tls-key ./lab-tls/key.pem
 \`\`\`
+
+Default bind is loopback HTTP. \`--tls\` without cert/key fail-closes. ACME is SLOT.
 
 FragGate catalog slug remains \`${PRODUCT}\` on aziel-runtime. This repo is the standalone public product.
 

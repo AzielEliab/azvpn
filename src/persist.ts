@@ -19,6 +19,7 @@ interface WireSession {
     circuit_id: string;
     mode: SessionMode;
     rendezvous_cookie?: string;
+    cell_size?: number;
     hops: {
       role: OnionCircuit["hops"][number]["role"];
       identity: HopIdentity;
@@ -53,6 +54,7 @@ export function saveEngine(path: string, engine: AzvpnEngine): void {
             circuit_id: s.circuit.circuit_id,
             mode: s.circuit.mode,
             rendezvous_cookie: s.circuit.rendezvous_cookie,
+            cell_size: s.circuit.cell_size,
             hops: s.circuit.hops.map((h) => ({
               role: h.role,
               identity: h.identity,
@@ -86,6 +88,7 @@ export function loadEngine(path: string): AzvpnEngine {
             circuit_id: s.circuit.circuit_id,
             mode: s.circuit.mode,
             rendezvous_cookie: s.circuit.rendezvous_cookie,
+            cell_size: s.circuit.cell_size ?? 512,
             hops: s.circuit.hops.map((h) => ({
               role: h.role,
               identity: h.identity,

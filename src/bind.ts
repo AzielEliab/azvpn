@@ -43,6 +43,7 @@ export interface BindRequest {
   host: string;
   exposeNonLoopback?: boolean;
   token?: string;
+  tls?: boolean;
 }
 
 export interface BindPolicy {
@@ -50,8 +51,8 @@ export interface BindPolicy {
   loopback: boolean;
   auth_required: boolean;
   token?: string;
-  transport: "http_ws";
-  tls: false;
+  transport: "http_ws" | "https_ws";
+  tls: boolean;
   danger?: string;
 }
 
@@ -63,7 +64,7 @@ export function assertBindPolicy(req: BindRequest): BindPolicy {
   if (!loopback && !req.exposeNonLoopback) {
     throw new BindPolicyError(
       "AZVPN-BIND-REFUSED",
-      `Non-loopback bind ${host} refused. Default is 127.0.0.1. Pass --expose-non-loopback and --token (or AZVPN_TOKEN) to opt in. Danger: this lab HTTP/WS concentrator has no TLS and would be reachable off-box.`,
+      `Non-loopback bind ${host} refused. Default is 127.0.0.1. Pass --expose-non-loopback and --token (or AZVPN_TOKEN) to opt in. Danger: off-box listen without that pair is refused. Prefer loopback.`,
     );
   }
   if (!loopback && (!token || token.length < MIN_TOKEN_LEN)) {
@@ -84,11 +85,13 @@ export function assertBindPolicy(req: BindRequest): BindPolicy {
     loopback,
     auth_required: Boolean(token),
     token,
-    transport: "http_ws",
-    tls: false,
+    transport: req.tls ? "https_ws" : "http_ws",
+    tls: Boolean(req.tls),
     danger: loopback
       ? undefined
-      : "Non-loopback HTTP/WS lab bind. Not TLS. Token required. Query ?token= leaks in logs and Referer. Prefer loopback.",
+      : req.tls
+        ? "Non-loopback HTTPS bind. Token required. Node TLS is classical (HN-DR residual). Query ?token= leaks in logs and Referer. Prefer loopback."
+        : "Non-loopback HTTP/WS lab bind. Not TLS. Token required. Query ?token= leaks in logs and Referer. Prefer loopback.",
   };
 }
 

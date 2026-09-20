@@ -77,6 +77,8 @@ export interface CircuitStatus {
   hops: CircuitHop[];
   shape: string;
   rendezvous_cookie?: string;
+  cell_size?: number;
+  cell_padded?: boolean;
   honesty: Honesty;
   note: string;
 }

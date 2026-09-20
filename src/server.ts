@@ -1,4 +1,6 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer as createHttpsServer, type Server as HttpsServer } from "node:https";
+import type { Server as HttpServer } from "node:http";
 import { WebSocketServer } from "ws";
 import {
   assertBindPolicy,
@@ -10,6 +12,7 @@ import {
   type BindPolicy,
 } from "./bind.js";
 import { AzvpnEngine } from "./engine.js";
+import { resolveTlsRequest, TlsPolicyError, type TlsMaterial } from "./tls.js";
 import { uiHtml } from "./ui-html.js";
 
 const GET_OPS = new Set(["health", "doctor", "limitation", "skill", ""]);
@@ -54,17 +57,20 @@ export interface ServeOptions {
   engine?: AzvpnEngine;
   exposeNonLoopback?: boolean;
   token?: string;
+  tls?: boolean;
+  tlsCert?: string;
+  tlsKey?: string;
 }
 
-export function createAzvpnServer(opts: ServeOptions = {}) {
-  const engine = opts.engine ?? new AzvpnEngine();
-  const policy = assertBindPolicy({
-    host: opts.host ?? DEFAULT_BIND,
-    exposeNonLoopback: opts.exposeNonLoopback,
-    token: opts.token,
-  });
-  const server = createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? DEFAULT_BIND}`);
+function attachHandler(
+  server: HttpServer | HttpsServer,
+  engine: AzvpnEngine,
+  policy: BindPolicy,
+  tlsOn: boolean,
+): void {
+  server.on("request", async (req: IncomingMessage, res: ServerResponse) => {
+    const proto = tlsOn ? "https" : "http";
+    const url = new URL(req.url ?? "/", `${proto}://${req.headers.host ?? DEFAULT_BIND}`);
     if (!authorize(req, policy, url)) {
       json(res, 401, {
         ok: false,
@@ -107,7 +113,8 @@ export function createAzvpnServer(opts: ServeOptions = {}) {
 
   const wss = new WebSocketServer({ noServer: true });
   server.on("upgrade", (req, socket, head) => {
-    const url = new URL(req.url ?? "/", `http://${DEFAULT_BIND}`);
+    const proto = tlsOn ? "https" : "http";
+    const url = new URL(req.url ?? "/", `${proto}://${DEFAULT_BIND}`);
     if (!authorize(req, policy, url)) {
       socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
       socket.destroy();
@@ -131,9 +138,11 @@ export function createAzvpnServer(opts: ServeOptions = {}) {
           honesty: "REAL",
           op: "attach",
           session_id: rec.session_id,
-          transport: "http_ws",
-          tls: false,
-          note: "Same inbox. Plain WS lab. Not TLS. Not a second door. Not origin-hiding.",
+          transport: tlsOn ? "https_ws" : "http_ws",
+          tls: tlsOn,
+          note: tlsOn
+            ? "Same inbox. WSS on this process. Node TLS is classical (HN-DR). Not a second door. Not origin-hiding."
+            : "Same inbox. Plain WS lab. Not TLS. Not a second door. Not origin-hiding.",
         }),
       );
       ws.on("message", (raw) => {
@@ -150,11 +159,38 @@ export function createAzvpnServer(opts: ServeOptions = {}) {
       });
     });
   });
-
-  return { server, engine, policy };
 }
 
-export function listen(opts: ServeOptions = {}): Promise<{ host: string; port: number; policy: BindPolicy; close: () => Promise<void> }> {
+export function createAzvpnServer(opts: ServeOptions = {}) {
+  const tls = resolveTlsRequest({
+    tls: opts.tls,
+    certPath: opts.tlsCert,
+    keyPath: opts.tlsKey,
+  });
+  const engine = opts.engine ?? new AzvpnEngine({ tlsTerminated: tls.enabled });
+  engine.setTlsTerminated(tls.enabled);
+  const policy = assertBindPolicy({
+    host: opts.host ?? DEFAULT_BIND,
+    exposeNonLoopback: opts.exposeNonLoopback,
+    token: opts.token,
+    tls: tls.enabled,
+  });
+  const server = tls.enabled
+    ? createHttpsServer({ cert: tls.cert, key: tls.key })
+    : createHttpServer();
+  attachHandler(server, engine, policy, tls.enabled);
+  return { server, engine, policy, tls };
+}
+
+export function listen(
+  opts: ServeOptions = {},
+): Promise<{
+  host: string;
+  port: number;
+  policy: BindPolicy;
+  tls: TlsMaterial;
+  close: () => Promise<void>;
+}> {
   const host = opts.host ?? DEFAULT_BIND;
   const port = opts.port ?? DEFAULT_PORT;
   let created: ReturnType<typeof createAzvpnServer>;
@@ -163,7 +199,7 @@ export function listen(opts: ServeOptions = {}): Promise<{ host: string; port: n
   } catch (err) {
     return Promise.reject(err);
   }
-  const { server, engine, policy } = created;
+  const { server, engine, policy, tls } = created;
   return new Promise((resolve, reject) => {
     server.listen(port, host, () => {
       const addr = server.address();
@@ -172,6 +208,7 @@ export function listen(opts: ServeOptions = {}): Promise<{ host: string; port: n
         host,
         port: bound,
         policy,
+        tls,
         close: () =>
           new Promise((done, fail) => {
             server.close((err) => (err ? fail(err) : done()));
@@ -183,4 +220,4 @@ export function listen(opts: ServeOptions = {}): Promise<{ host: string; port: n
   });
 }
 
-export { BindPolicyError };
+export { BindPolicyError, TlsPolicyError };

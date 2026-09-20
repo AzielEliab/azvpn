@@ -34,6 +34,14 @@ export function concat(...parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
+/** Best-effort overwrite. V8 copies, JIT, and core dumps remain a side-channel residual. */
+export function wipeBytes(...bufs: Array<Uint8Array | undefined | null>): void {
+  for (const buf of bufs) {
+    if (!buf) continue;
+    buf.fill(0);
+  }
+}
+
 export function id(prefix: string, bytes = 16): string {
   return `${prefix}_${toHex(randomBytes(bytes))}`;
 }

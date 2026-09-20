@@ -41,7 +41,8 @@ export function uiHtml(): string {
       <span class="badge REAL">HTTP/WS lab REAL</span>
       <span class="badge REAL">onion layering REAL</span>
       <span class="badge REAL">hybrid PQC REAL</span>
-      <span class="badge SLOT">HTTPS/TLS SLOT</span>
+      <span id="tls-badge" class="badge SLOT">HTTPS/TLS SLOT unless this process terminates TLS</span>
+      <span class="badge SLOT">ACME SLOT</span>
       <span class="badge SLOT">WireGuard SLOT</span>
       <span class="badge SLOT">public Tor SLOT</span>
       <span class="badge SLOT">origin-hiding SLOT</span>
@@ -87,7 +88,7 @@ export function uiHtml(): string {
     </section>
   </main>
   <footer>
-    Standalone public product. Lumen stays private. This UI is HTTP/WS lab, not TLS. Loopback default. No latency theater. No “untraceable proven.”
+    Standalone public product. Lumen stays private. HTTPS is REAL only when this process terminates TLS. Loopback default. No latency theater. No “untraceable proven.”
   </footer>
   <script>
     let sessionId = null;
@@ -134,6 +135,14 @@ export function uiHtml(): string {
     document.getElementById("doctor").onclick = async () => {
       show(out, await call("doctor"));
     };
+    call("health").then((h) => {
+      const badge = document.getElementById("tls-badge");
+      if (!badge) return;
+      if (h && h.transport && h.transport.tls) {
+        badge.className = "badge REAL";
+        badge.textContent = "HTTPS/TLS REAL (this process terminates TLS)";
+      }
+    }).catch(() => undefined);
   </script>
 </body>
 </html>`;

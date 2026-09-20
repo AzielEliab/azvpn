@@ -18,7 +18,10 @@ describe("concentrator engine", () => {
     const ticket = engine.dispatch("attach", { session_id: id });
     assert.equal(ticket.honesty, "REAL");
     assert.ok(typeof ticket.ticket === "string");
-    assert.equal(engine.dispatch("close", { session_id: id }).ok, true);
+    const closed = engine.dispatch("close", { session_id: id });
+    assert.equal(closed.ok, true);
+    assert.equal(closed.keys_wiped, true);
+    assert.deepEqual([...engine.sessions.get(id)!.session_key], new Array(32).fill(0));
     assert.equal(engine.dispatch("status", { session_id: id }).ok, false);
   });
 

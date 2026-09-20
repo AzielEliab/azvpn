@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { AzvpnEngine } from "../src/engine.js";
-import { honestyBanner, KINDS, LIMITATION, STUB_OPS } from "../src/honesty.js";
+import { honestyBanner, KINDS, LIMITATION, residualsFor, STUB_OPS } from "../src/honesty.js";
 
 describe("honesty matrix", () => {
   it("labels HTTP/WS lab and onion layering REAL", () => {
@@ -12,11 +12,16 @@ describe("honesty matrix", () => {
     assert.equal(KINDS.rendezvous_join, "REAL");
   });
 
-  it("does not claim HTTPS/TLS on this process", () => {
+  it("does not claim HTTPS/TLS on this process unless TLS terminates", () => {
     assert.equal(KINDS.https_tls, "SLOT");
     assert.equal(KINDS.https_ws, "SLOT");
     assert.match(LIMITATION, /not TLS/i);
     assert.doesNotMatch(LIMITATION, /HTTPS\/WS, encrypted/);
+    const on = honestyBanner({ tls_terminated: true });
+    assert.equal(on.kinds.https_tls, "REAL");
+    assert.equal(on.kinds.https_ws, "REAL");
+    assert.equal(on.transport.tls, true);
+    assert.equal(on.transport.acme, "SLOT");
   });
 
   it("labels kernel VPN and public Tor SLOT", () => {
@@ -39,7 +44,13 @@ describe("honesty matrix", () => {
     const banner = honestyBanner();
     assert.ok(banner.claims_refused.includes("untraceable proven"));
     assert.ok(banner.residuals.every((r) => r.residual === "NOT_QUANTUM_PROOF"));
+    const notes = residualsFor().map((r) => r.note).join("\n");
+    assert.match(notes, /HN-DR|Harvest-Now-Decrypt-Later/);
+    assert.match(notes, /Grover/);
+    assert.match(notes, /Host metadata/);
+    assert.match(notes, /side-channel/);
     assert.equal(banner.lumen.private_canon_in_this_repo, false);
     assert.equal(banner.transport.tls, false);
+    assert.equal(banner.transport.acme, "SLOT");
   });
 });

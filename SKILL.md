@@ -1,13 +1,15 @@
 ---
 name: AZVPN
 description: >-
-  Standalone HTTP/WS lab concentrator with in-process onion circuits. Not TLS.
+  Standalone HTTP/WS lab concentrator with optional Node TLS terminate
+  and in-process onion circuits. HTTPS REAL only when TLS terminates.
   Author Aziel Eliab.
 ---
 
 # AZVPN
 
-HTTP/WS lab + onion peel are REAL. HTTPS/TLS, kernel VPN, and public Tor stay SLOT.
+HTTP/WS lab + onion peel are REAL. HTTPS is REAL only when this process
+terminates TLS. ACME, kernel VPN, and public Tor stay SLOT.
 
 Author: **Aziel Eliab**. Identity is Aziel Eliab only.
 Version: 0.1.0
@@ -21,9 +23,12 @@ Always send `User-Agent: Mozilla/5.0`.
 npx tsx src/cli.ts health
 npx tsx src/cli.ts open --peer alice --mode onion
 npx tsx src/cli.ts serve
+npx tsx src/cli.ts cert --dir ./lab-tls
+npx tsx src/cli.ts serve --tls --tls-cert ./lab-tls/cert.pem --tls-key ./lab-tls/key.pem
 ```
 
 `serve` binds 127.0.0.1. Non-loopback needs `--expose-non-loopback` and `--token`.
+`--tls` without cert/key fail-closes.
 
 ## Catalog (neighbor, not this repo)
 
@@ -31,7 +36,8 @@ npx tsx src/cli.ts serve
 - Invoke prefix: `https://aziel-runtime.vibelock.workers.dev/p/azvpn`
 - FragGate: `{ "slug": "azvpn", "op": "health" }`
 
-Catalog kind `https_ws` is the Worker name. This process is HTTP/WS lab.
+Catalog kind `https_ws` is the Worker name. This process is HTTP/WS lab unless
+it terminates TLS.
 
 ## Live ops
 
@@ -39,6 +45,6 @@ health, skill, doctor, limitation, describe, open, status, list, close, send, re
 
 ## SLOT (refuse)
 
-https_tls, wireguard, openvpn, l3_exit, tun, tap, socks, tor, origin_hiding
+acme, wireguard, openvpn, l3_exit, tun, tap, socks, tor, origin_hiding
 
 Lumen stays private. This skill is public AZVPN only.
