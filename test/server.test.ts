@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
+import https from "node:https";
 import { BindPolicyError } from "../src/bind.js";
 import { AzvpnEngine } from "../src/engine.js";
 import { listen } from "../src/server.js";
+import { TlsPolicyError, writeLabCertificate } from "../src/tls.js";
 
 describe("HTTP/WS concentrator", () => {
   it("refuses non-loopback listen without opt-in and token", async () => {
@@ -53,4 +58,51 @@ describe("HTTP/WS concentrator", () => {
     assert.equal(slotJson.honesty, "SLOT");
     await srv.close();
   });
+
+  it("fail-closes --tls without cert/key", async () => {
+    await assert.rejects(
+      () => listen({ host: "127.0.0.1", port: 0, engine: new AzvpnEngine(), tls: true }),
+      (err: unknown) => err instanceof TlsPolicyError && err.code === "AZVPN-TLS-REQUIRED",
+    );
+  });
+
+  it("terminates HTTPS when cert/key are present", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "azvpn-tls-"));
+    const written = writeLabCertificate(dir);
+    const engine = new AzvpnEngine();
+    const srv = await listen({
+      host: "127.0.0.1",
+      port: 0,
+      engine,
+      tls: true,
+      tlsCert: written.certPath,
+      tlsKey: written.keyPath,
+    });
+    assert.equal(srv.tls.enabled, true);
+    assert.equal(srv.policy.tls, true);
+    const body = await httpsJson(`https://127.0.0.1:${srv.port}/v1/health`);
+    assert.equal(body.ok, true);
+    assert.equal((body.transport as { tls: boolean }).tls, true);
+    assert.equal((body.kinds as { https_tls: string }).https_tls, "REAL");
+    assert.equal((body.kinds as { https_ws: string }).https_ws, "REAL");
+    await srv.close();
+  });
 });
+
+function httpsJson(url: string): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    https
+      .get(url, { rejectUnauthorized: false }, (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>);
+          } catch (err) {
+            reject(err);
+          }
+        });
+      })
+      .on("error", reject);
+  });
+}

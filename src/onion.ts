@@ -2,6 +2,8 @@ import { fromUtf8, id, toHex, utf8 } from "./bytes.js";
 import { open, seal } from "./crypto.js";
 import {
   acceptHandshake,
+  assertHopIdentity,
+  assertHybridOffer,
   generateHopIdentity,
   hybridHandshake,
   type HandshakeOffer,
@@ -21,6 +23,7 @@ export interface OnionCircuit {
   mode: SessionMode;
   hops: BuiltHop[];
   rendezvous_cookie?: string;
+  cell_size: number;
 }
 
 export interface PeelStep {
@@ -31,6 +34,32 @@ export interface PeelStep {
 }
 
 const LAYER_AAD = utf8("AZVPN-ONION-1.0");
+
+/** Fixed-size onion cell (bytes of padded inner payload). Coarse size buckets only. */
+export const ONION_CELL_SIZE = 512;
+
+export function cellSizeFor(payloadLen: number): number {
+  const need = payloadLen + 2;
+  const cells = Math.max(1, Math.ceil(need / ONION_CELL_SIZE));
+  return cells * ONION_CELL_SIZE;
+}
+
+export function padCell(payload: Uint8Array, size = cellSizeFor(payload.length)): Uint8Array {
+  if (payload.length > 0xffff) throw new Error("AZVPN-CELL-TOO-LARGE");
+  if (size < payload.length + 2) throw new Error("AZVPN-CELL-UNDERSIZE");
+  const out = new Uint8Array(size);
+  out[0] = (payload.length >> 8) & 0xff;
+  out[1] = payload.length & 0xff;
+  out.set(payload, 2);
+  return out;
+}
+
+export function unpadCell(cell: Uint8Array): Uint8Array {
+  if (cell.length < 2) throw new Error("AZVPN-BAD-CELL");
+  const len = (cell[0] << 8) | cell[1];
+  if (len > cell.length - 2) throw new Error("AZVPN-BAD-CELL");
+  return cell.subarray(2, 2 + len);
+}
 
 function packLayer(next: string | undefined, inner: string): Uint8Array {
   return utf8(JSON.stringify({ next: next ?? null, inner }));
@@ -56,6 +85,7 @@ export function selectHops(roster: HopIdentity[], mode: SessionMode): { role: Ho
   const need = (hop_id: string, role: HopRole) => {
     const identity = byId.get(hop_id);
     if (!identity) throw new Error("AZVPN-MISSING-HOP");
+    assertHopIdentity(identity);
     return { role, identity };
   };
   if (mode === "http_ws") return [];
@@ -76,9 +106,11 @@ export function selectHops(roster: HopIdentity[], mode: SessionMode): { role: Ho
 export function buildCircuit(roster: HopIdentity[], mode: SessionMode, cookie?: string): OnionCircuit {
   const selected = selectHops(roster, mode);
   const hops: BuiltHop[] = selected.map(({ role, identity }) => {
+    assertHopIdentity(identity);
     const hs = hybridHandshake(identity);
     const accepted = acceptHandshake(identity, hs.offer);
     if (toHex(hs.key) !== toHex(accepted)) throw new Error("AZVPN-HANDSHAKE-MISMATCH");
+    assertHybridOffer(hs.offer);
     return { role, identity, client_key: hs.key, offer: hs.offer };
   });
   return {
@@ -86,13 +118,14 @@ export function buildCircuit(roster: HopIdentity[], mode: SessionMode, cookie?: 
     mode,
     hops,
     rendezvous_cookie: mode === "rendezvous" ? cookie ?? id("rend", 8) : undefined,
+    cell_size: ONION_CELL_SIZE,
   };
 }
 
-/** Wrap exit → middle → entry so each hop peels one layer. */
+/** Wrap exit → middle → entry so each hop peels one layer. Innermost payload is a fixed-size cell. */
 export function wrapOnion(circuit: OnionCircuit, plaintext: Uint8Array): string {
-  if (circuit.hops.length === 0) return seal(utf8("unused".padEnd(32, "0")).slice(0, 32), plaintext);
-  let current = toHex(plaintext);
+  if (circuit.hops.length === 0) return seal(utf8("unused".padEnd(32, "0")).slice(0, 32), padCell(plaintext));
+  let current = toHex(padCell(plaintext, cellSizeFor(plaintext.length)));
   for (let i = circuit.hops.length - 1; i >= 0; i -= 1) {
     const hop = circuit.hops[i];
     const next = i + 1 < circuit.hops.length ? circuit.hops[i + 1].identity.hop_id : undefined;
@@ -119,7 +152,7 @@ export function transit(circuit: OnionCircuit, onion: string): { plaintext: Uint
       remaining_hex: current.length > 64 ? `${current.slice(0, 64)}…` : current,
     });
   }
-  return { plaintext: Buffer.from(current, "hex"), steps };
+  return { plaintext: unpadCell(Buffer.from(current, "hex")), steps };
 }
 
 export function circuitStatus(circuit: OnionCircuit): CircuitStatus {
@@ -136,18 +169,20 @@ export function circuitStatus(circuit: OnionCircuit): CircuitStatus {
     hops,
     shape,
     rendezvous_cookie: circuit.rendezvous_cookie,
+    cell_size: circuit.cell_size ?? ONION_CELL_SIZE,
+    cell_padded: hops.length > 0,
     honesty: "REAL",
     note:
       circuit.mode === "http_ws"
-        ? "Direct HTTP/WS lab session. Not TLS. No onion hops."
-        : "In-process layered circuit. Public Tor directory / origin-hiding stay SLOT. Not untraceable proven.",
+        ? "Direct HTTP/WS lab session. TLS only if this process terminated HTTPS. No onion hops."
+        : "In-process layered circuit with fixed-size cells (payload-length buckets). Public Tor directory / origin-hiding stay SLOT. Padding is not origin-hiding. Not untraceable proven.",
   };
 }
 
 export function wrapHttpsEnvelope(sessionKey: Uint8Array, plaintext: Uint8Array): string {
-  return seal(sessionKey, plaintext, utf8("AZVPN-ENVELOPE-1.0"));
+  return seal(sessionKey, padCell(plaintext), utf8("AZVPN-ENVELOPE-1.0"));
 }
 
 export function openHttpsEnvelope(sessionKey: Uint8Array, packed: string): Uint8Array {
-  return open(sessionKey, packed, utf8("AZVPN-ENVELOPE-1.0"));
+  return unpadCell(open(sessionKey, packed, utf8("AZVPN-ENVELOPE-1.0")));
 }

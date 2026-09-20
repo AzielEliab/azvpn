@@ -1,6 +1,14 @@
-import { fromUtf8, id, randomBytes, toHex, utf8 } from "./bytes.js";
-import { honestyBanner, isStubOp, LIMITATION, SLOT_NOTES } from "./honesty.js";
-import { generateHopIdentity, hybridHandshake, refuseX25519Only, type HopIdentity } from "./handshake.js";
+import { fromUtf8, id, randomBytes, toHex, utf8, wipeBytes } from "./bytes.js";
+import { honestyBanner, isStubOp, SLOT_NOTES } from "./honesty.js";
+import {
+  generateHopIdentity,
+  HandshakeRefuseError,
+  hybridHandshake,
+  refuseClassicalOnly,
+  refuseX25519Only,
+  type HandshakeResult,
+  type HopIdentity,
+} from "./handshake.js";
 import {
   buildCircuit,
   circuitStatus,
@@ -29,6 +37,7 @@ export interface SessionRecord {
 export interface EngineOptions {
   now?: () => Date;
   roster?: HopIdentity[];
+  tlsTerminated?: boolean;
 }
 
 export type EngineResult = Record<string, unknown>;
@@ -46,11 +55,21 @@ export class AzvpnEngine {
   readonly roster: HopIdentity[];
   readonly sessions = new Map<string, SessionRecord>();
   readonly rendezvous = new Map<string, Set<string>>();
+  private tlsTerminated: boolean;
   private readonly now: () => Date;
 
   constructor(opts: EngineOptions = {}) {
     this.now = opts.now ?? (() => new Date());
     this.roster = opts.roster ?? defaultRelayRoster();
+    this.tlsTerminated = Boolean(opts.tlsTerminated);
+  }
+
+  setTlsTerminated(terminated: boolean): void {
+    this.tlsTerminated = Boolean(terminated);
+  }
+
+  banner() {
+    return honestyBanner({ tls_terminated: this.tlsTerminated });
   }
 
   iso(): string {
@@ -58,8 +77,9 @@ export class AzvpnEngine {
   }
 
   dispatch(op: string, payload: Record<string, unknown> = {}): EngineResult {
-    if (isStubOp(op) || op === "x25519_only") {
+    if (isStubOp(op) || op === "x25519_only" || op === "classical_only") {
       if (op === "x25519_only") return refuseX25519Only();
+      if (op === "classical_only") return refuseClassicalOnly();
       return {
         ok: false,
         code: "AZVPN-SLOT",
@@ -109,7 +129,7 @@ export class AzvpnEngine {
       op: "health",
       status: "ok",
       role: "application-layer tunnel concentrator + in-process onion router",
-      ...honestyBanner(),
+      ...this.banner(),
       open_tunnels: [...this.sessions.values()].filter((s) => !s.closed).length,
       worker_terminates_tunnels: true,
       worker_terminates_kernel_udp: false,
@@ -129,9 +149,9 @@ export class AzvpnEngine {
       ok: true,
       op: "doctor",
       product: PRODUCT,
-      matrix: honestyBanner().honesty,
-      kinds: honestyBanner().kinds,
-      residuals: honestyBanner().residuals,
+      matrix: this.banner().honesty,
+      kinds: this.banner().kinds,
+      residuals: this.banner().residuals,
       open_tunnels: [...this.sessions.values()].filter((s) => !s.closed).length,
       relays: this.roster.map((r) => r.hop_id),
       note: "Doctor reports the REAL/SLOT matrix. It does not invent latency or claim a public Tor overlay.",
@@ -142,7 +162,7 @@ export class AzvpnEngine {
     return {
       ok: true,
       op: "limitation",
-      ...honestyBanner(),
+      ...this.banner(),
     };
   }
 
@@ -152,21 +172,22 @@ export class AzvpnEngine {
 
   describe(payload: Record<string, unknown>): EngineResult {
     const kind = typeof payload.kind === "string" ? payload.kind : "http_ws";
-    const banner = honestyBanner();
-    const mapped = kind === "https_ws" ? "http_ws" : kind;
+    const banner = this.banner();
+    const mapped = kind === "https_ws" && !this.tlsTerminated ? "http_ws" : kind;
     return {
       ok: true,
       op: "describe",
       kind: mapped,
       requested: kind,
       honesty: (banner.kinds as Record<string, string>)[kind] ?? (banner.kinds as Record<string, string>)[mapped] ?? "SLOT",
-      tls: false,
+      tls: this.tlsTerminated,
       peer: typeof payload.peer === "string" ? payload.peer : null,
-      concentrator: "http_ws",
+      concentrator: this.tlsTerminated ? "https_ws" : "http_ws",
       onion: "in-process layered circuits",
       public_tor: "SLOT",
-      https_tls: "SLOT",
-      note: LIMITATION,
+      https_tls: banner.kinds.https_tls,
+      acme: "SLOT",
+      note: banner.limitation,
     };
   }
 
@@ -187,8 +208,15 @@ export class AzvpnEngine {
     const peer = typeof payload.peer === "string" && payload.peer ? payload.peer : "peer-local";
     const cookie = typeof payload.cookie === "string" ? payload.cookie : undefined;
     const session_id = id("sess");
-    const hs = hybridHandshake(generateHopIdentity(`session.${session_id}`));
-    const circuit = mode === "http_ws" ? undefined : buildCircuit(this.roster, mode, cookie);
+    let hs: HandshakeResult;
+    let circuit: OnionCircuit | undefined;
+    try {
+      hs = hybridHandshake(generateHopIdentity(`session.${session_id}`));
+      circuit = mode === "http_ws" ? undefined : buildCircuit(this.roster, mode, cookie);
+    } catch (err) {
+      if (err instanceof HandshakeRefuseError) return err.toJSON();
+      throw err;
+    }
     if (circuit?.rendezvous_cookie) {
       const set = this.rendezvous.get(circuit.rendezvous_cookie) ?? new Set<string>();
       set.add(session_id);
@@ -214,8 +242,15 @@ export class AzvpnEngine {
       mode,
       handshake: hs.handshake,
       residuals: hs.residuals,
-      circuit: circuit ? circuitStatus(circuit) : { shape: "direct http_ws (lab)", honesty: "REAL", tls: false },
-      transport: { lab: "http_ws", tls: false, https_tls: "SLOT" },
+      circuit: circuit
+        ? circuitStatus(circuit)
+        : { shape: this.tlsTerminated ? "direct https_ws" : "direct http_ws (lab)", honesty: "REAL", tls: this.tlsTerminated },
+      transport: {
+        lab: this.tlsTerminated ? "https_ws" : "http_ws",
+        tls: this.tlsTerminated,
+        https_tls: this.tlsTerminated ? "REAL" : "SLOT",
+        acme: "SLOT",
+      },
       receipt: {
         session_id,
         opened_at: record.opened_at,
@@ -224,8 +259,10 @@ export class AzvpnEngine {
       },
       note:
         mode === "http_ws"
-          ? "Application-layer HTTP/WS lab session opened. Not TLS. Not a kernel VPN."
-          : "Onion circuit built in-process. Public Tor / origin-hiding stay SLOT. Not untraceable proven.",
+          ? this.tlsTerminated
+            ? "Application-layer HTTPS/WSS session opened on this process. Node TLS is classical (HN-DR). Not a kernel VPN."
+            : "Application-layer HTTP/WS lab session opened. Not TLS. Not a kernel VPN."
+          : "Onion circuit built in-process with hybrid hop keys and fixed-size cells. Public Tor / origin-hiding stay SLOT. Not untraceable proven.",
     };
   }
 
@@ -252,7 +289,9 @@ export class AzvpnEngine {
       opened_at: rec.opened_at,
       closed: rec.closed,
       inbox: rec.inbox.length,
-      circuit: rec.circuit ? circuitStatus(rec.circuit) : { shape: "direct http_ws (lab)", honesty: "REAL", tls: false },
+      circuit: rec.circuit
+        ? circuitStatus(rec.circuit)
+        : { shape: this.tlsTerminated ? "direct https_ws" : "direct http_ws (lab)", honesty: "REAL", tls: this.tlsTerminated },
       attach_ticket: rec.attach_ticket ?? null,
     };
   }
@@ -268,7 +307,11 @@ export class AzvpnEngine {
         mode: s.mode,
         opened_at: s.opened_at,
         closed: s.closed,
-        shape: s.circuit ? circuitStatus(s.circuit).shape : "direct http_ws (lab)",
+        shape: s.circuit
+          ? circuitStatus(s.circuit).shape
+          : this.tlsTerminated
+            ? "direct https_ws"
+            : "direct http_ws (lab)",
       })),
     };
   }
@@ -278,7 +321,20 @@ export class AzvpnEngine {
     if (got.err) return got.err;
     const rec = got.rec;
     rec.closed = true;
-    return { ok: true, op: "close", honesty: "REAL", session_id: rec.session_id, closed: true };
+    wipeBytes(rec.session_key);
+    if (rec.circuit) {
+      for (const hop of rec.circuit.hops) wipeBytes(hop.client_key);
+    }
+    return {
+      ok: true,
+      op: "close",
+      honesty: "REAL",
+      session_id: rec.session_id,
+      closed: true,
+      keys_wiped: true,
+      wipe_residual: "NOT_QUANTUM_PROOF",
+      note: "Session and hop keys filled with zeros. V8 copies / core dumps remain a side-channel residual.",
+    };
   }
 
   send(payload: Record<string, unknown>): EngineResult {
@@ -386,7 +442,9 @@ export class AzvpnEngine {
       session_id: rec.session_id,
       ticket: rec.attach_ticket,
       path: "/v1/ws",
-      note: "WS attach ticket for the same inbox. Not a second door. Not a kernel VPN.",
+      note: this.tlsTerminated
+        ? "WSS attach ticket for the same inbox. Not a second door. Not a kernel VPN. Not origin-hiding."
+        : "WS attach ticket for the same inbox. Not a second door. Not a kernel VPN. Not TLS.",
     };
   }
 
@@ -399,8 +457,10 @@ export class AzvpnEngine {
       op: "circuit",
       honesty: "REAL",
       session_id: rec.session_id,
-      circuit: rec.circuit ? circuitStatus(rec.circuit) : { shape: "direct http_ws (lab)", honesty: "REAL", tls: false },
-      residuals: honestyBanner().residuals,
+      circuit: rec.circuit
+        ? circuitStatus(rec.circuit)
+        : { shape: this.tlsTerminated ? "direct https_ws" : "direct http_ws (lab)", honesty: "REAL", tls: this.tlsTerminated },
+      residuals: this.banner().residuals,
     };
   }
 

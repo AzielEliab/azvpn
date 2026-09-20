@@ -28,6 +28,10 @@ describe("CLI", () => {
     assert.match(help.stdout, /SLOT/);
     assert.match(help.stdout, /HTTP\/WS lab/);
     assert.match(help.stdout, /expose-non-loopback/);
+    assert.match(help.stdout, /--tls/);
+    const tlsRefused = await capture(() => main(["serve", "--tls"]));
+    assert.equal(tlsRefused.code, 2);
+    assert.match(tlsRefused.stdout, /AZVPN-TLS-REQUIRED/);
     const refused = await capture(() => main(["serve", "--host", "0.0.0.0"]));
     assert.equal(refused.code, 2);
     assert.match(refused.stdout, /AZVPN-BIND-REFUSED/);
@@ -46,5 +50,10 @@ describe("CLI", () => {
     assert.equal(send.code, 0);
     const recv = await capture(() => main(["recv", "--state", state, "--id", session.session_id]));
     assert.match(recv.stdout, /from-cli/);
+    const certDir = join(dir, "lab-tls");
+    const cert = await capture(() => main(["cert", "--dir", certDir]));
+    assert.equal(cert.code, 0);
+    assert.match(cert.stdout, /lab_self_signed/);
+    assert.match(cert.stdout, /SLOT/);
   });
 });

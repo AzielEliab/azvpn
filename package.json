@@ -1,7 +1,7 @@
 {
   "name": "azvpn",
   "version": "0.1.0",
-  "description": "AZVPN — HTTP/WS lab concentrator with in-process onion circuits. Not TLS. Author Aziel Eliab only.",
+  "description": "AZVPN — HTTP/WS lab concentrator with optional Node TLS terminate and in-process onion circuits. HTTPS REAL only when TLS terminates. Author Aziel Eliab only.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "Aziel Eliab",

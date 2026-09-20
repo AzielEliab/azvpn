@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .azvpn-state.json
+lab-tls/
 *.log
 .DS_Store
 coverage/

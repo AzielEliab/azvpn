@@ -20,6 +20,9 @@ describe("bind policy", () => {
     assert.equal(policy.auth_required, false);
     assert.equal(policy.tls, false);
     assert.equal(policy.transport, "http_ws");
+    const tlsPolicy = assertBindPolicy({ host: "127.0.0.1", tls: true });
+    assert.equal(tlsPolicy.tls, true);
+    assert.equal(tlsPolicy.transport, "https_ws");
   });
 
   it("refuses non-loopback without explicit opt-in", () => {

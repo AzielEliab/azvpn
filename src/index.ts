@@ -22,10 +22,21 @@ export type {
   StubOp,
 } from "./types.js";
 export { AzvpnEngine, createEngine } from "./engine.js";
-export { honestyBanner, KINDS, LIMITATION, LIVE_OPS, MOTTO, NOT_QUANTUM_PROOF, STUB_OPS } from "./honesty.js";
-export { acceptHandshake, generateHopIdentity, hybridHandshake, refuseX25519Only } from "./handshake.js";
-export { buildCircuit, circuitStatus, peelAtHop, transit, wrapOnion } from "./onion.js";
+export { honestyBanner, kindsFor, KINDS, LIMITATION, limitationText, LIVE_OPS, MOTTO, NOT_QUANTUM_PROOF, residualsFor, STUB_OPS } from "./honesty.js";
+export {
+  acceptHandshake,
+  assertHopIdentity,
+  assertHybridOffer,
+  generateHopIdentity,
+  HandshakeRefuseError,
+  hybridHandshake,
+  refuseClassicalOnly,
+  refuseX25519Only,
+} from "./handshake.js";
+export { buildCircuit, cellSizeFor, circuitStatus, ONION_CELL_SIZE, padCell, peelAtHop, transit, unpadCell, wrapOnion } from "./onion.js";
 export { assertBindPolicy, BindPolicyError, isLoopbackHost } from "./bind.js";
 export { createAzvpnServer, listen } from "./server.js";
+export { generateLabCertificate, resolveTlsRequest, TlsPolicyError, writeLabCertificate } from "./tls.js";
+export { wipeBytes } from "./bytes.js";
 export { main as cli } from "./cli.js";
 export { skillMarkdown } from "./skill-text.js";
