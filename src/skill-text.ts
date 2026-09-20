@@ -14,7 +14,7 @@ export function skillMarkdown(): string {
   return `---
 name: ${NAME}
 description: >-
-  Standalone HTTPS/WebSocket concentrator with in-process onion circuits.
+  Standalone HTTP/WS lab concentrator with in-process onion circuits. Not TLS.
   Author ${AUTHOR}.
 ---
 

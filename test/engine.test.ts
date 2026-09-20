@@ -3,9 +3,10 @@ import { describe, it } from "node:test";
 import { AzvpnEngine } from "../src/engine.js";
 
 describe("concentrator engine", () => {
-  it("opens HTTPS/WS, send/recv, attach, close", () => {
+  it("opens HTTP/WS lab, send/recv, attach, close", () => {
     const engine = new AzvpnEngine();
-    const opened = engine.dispatch("open", { peer: "alice", mode: "https_ws" });
+    const opened = engine.dispatch("open", { peer: "alice", mode: "http_ws" });
+    assert.equal(opened.transport && (opened.transport as { tls: boolean }).tls, false);
     assert.equal(opened.ok, true);
     assert.equal(opened.honesty, "REAL");
     const id = opened.session_id as string;
@@ -19,6 +20,14 @@ describe("concentrator engine", () => {
     assert.ok(typeof ticket.ticket === "string");
     assert.equal(engine.dispatch("close", { session_id: id }).ok, true);
     assert.equal(engine.dispatch("status", { session_id: id }).ok, false);
+  });
+
+  it("maps catalog https_ws alias to http_ws lab without TLS", () => {
+    const engine = new AzvpnEngine();
+    const aliased = engine.dispatch("open", { peer: "alias", mode: "https_ws" });
+    assert.equal(aliased.ok, true);
+    assert.equal(aliased.mode, "http_ws");
+    assert.equal((aliased.transport as { tls: boolean }).tls, false);
   });
 
   it("opens onion session and peels on recv", () => {

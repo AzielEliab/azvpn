@@ -1,5 +1,14 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { WebSocketServer } from "ws";
+import {
+  assertBindPolicy,
+  BindPolicyError,
+  DEFAULT_BIND,
+  DEFAULT_PORT,
+  extractToken,
+  tokenMatches,
+  type BindPolicy,
+} from "./bind.js";
 import { AzvpnEngine } from "./engine.js";
 import { uiHtml } from "./ui-html.js";
 
@@ -33,16 +42,37 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(data);
 }
 
+function authorize(req: IncomingMessage, policy: BindPolicy, url: URL): boolean {
+  if (!policy.auth_required || !policy.token) return true;
+  const provided = extractToken(req.headers, url.searchParams.get("token"));
+  return tokenMatches(provided, policy.token);
+}
+
 export interface ServeOptions {
   host?: string;
   port?: number;
   engine?: AzvpnEngine;
+  exposeNonLoopback?: boolean;
+  token?: string;
 }
 
 export function createAzvpnServer(opts: ServeOptions = {}) {
   const engine = opts.engine ?? new AzvpnEngine();
+  const policy = assertBindPolicy({
+    host: opts.host ?? DEFAULT_BIND,
+    exposeNonLoopback: opts.exposeNonLoopback,
+    token: opts.token,
+  });
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "127.0.0.1"}`);
+    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? DEFAULT_BIND}`);
+    if (!authorize(req, policy, url)) {
+      json(res, 401, {
+        ok: false,
+        code: "AZVPN-AUTH-FAIL",
+        note: "Bearer token required (Authorization: Bearer … or x-azvpn-token). Query ?token= is accepted but leaks.",
+      });
+      return;
+    }
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/ui")) {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(uiHtml());
@@ -53,7 +83,7 @@ export function createAzvpnServer(opts: ServeOptions = {}) {
       return;
     }
     const match = url.pathname.match(/^\/v1\/([a-z0-9_]+)$/);
-    const op = match?.[1] ?? (url.pathname === "/v1/health" ? "health" : "");
+    const op = match?.[1] ?? "";
     if (!op) {
       json(res, 404, { ok: false, code: "AZVPN-NOT-FOUND", note: url.pathname });
       return;
@@ -77,7 +107,12 @@ export function createAzvpnServer(opts: ServeOptions = {}) {
 
   const wss = new WebSocketServer({ noServer: true });
   server.on("upgrade", (req, socket, head) => {
-    const url = new URL(req.url ?? "/", "http://127.0.0.1");
+    const url = new URL(req.url ?? "/", `http://${DEFAULT_BIND}`);
+    if (!authorize(req, policy, url)) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
     if (url.pathname !== "/v1/ws") {
       socket.destroy();
       return;
@@ -96,7 +131,9 @@ export function createAzvpnServer(opts: ServeOptions = {}) {
           honesty: "REAL",
           op: "attach",
           session_id: rec.session_id,
-          note: "Same inbox. Not a second door. Not origin-hiding.",
+          transport: "http_ws",
+          tls: false,
+          note: "Same inbox. Plain WS lab. Not TLS. Not a second door. Not origin-hiding.",
         }),
       );
       ws.on("message", (raw) => {
@@ -114,13 +151,19 @@ export function createAzvpnServer(opts: ServeOptions = {}) {
     });
   });
 
-  return { server, engine };
+  return { server, engine, policy };
 }
 
-export function listen(opts: ServeOptions = {}): Promise<{ host: string; port: number; close: () => Promise<void> }> {
-  const host = opts.host ?? "127.0.0.1";
-  const port = opts.port ?? 8787;
-  const { server, engine } = createAzvpnServer({ ...opts, engine: opts.engine });
+export function listen(opts: ServeOptions = {}): Promise<{ host: string; port: number; policy: BindPolicy; close: () => Promise<void> }> {
+  const host = opts.host ?? DEFAULT_BIND;
+  const port = opts.port ?? DEFAULT_PORT;
+  let created: ReturnType<typeof createAzvpnServer>;
+  try {
+    created = createAzvpnServer({ ...opts, host, engine: opts.engine });
+  } catch (err) {
+    return Promise.reject(err);
+  }
+  const { server, engine, policy } = created;
   return new Promise((resolve, reject) => {
     server.listen(port, host, () => {
       const addr = server.address();
@@ -128,6 +171,7 @@ export function listen(opts: ServeOptions = {}): Promise<{ host: string; port: n
       resolve({
         host,
         port: bound,
+        policy,
         close: () =>
           new Promise((done, fail) => {
             server.close((err) => (err ? fail(err) : done()));
@@ -138,3 +182,5 @@ export function listen(opts: ServeOptions = {}): Promise<{ host: string; port: n
     void engine;
   });
 }
+
+export { BindPolicyError };

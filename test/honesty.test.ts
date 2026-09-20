@@ -1,15 +1,22 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { AzvpnEngine } from "../src/engine.js";
-import { honestyBanner, KINDS, STUB_OPS } from "../src/honesty.js";
+import { honestyBanner, KINDS, LIMITATION, STUB_OPS } from "../src/honesty.js";
 
 describe("honesty matrix", () => {
-  it("labels HTTPS/WS and onion layering REAL", () => {
-    assert.equal(KINDS.https_ws, "REAL");
+  it("labels HTTP/WS lab and onion layering REAL", () => {
+    assert.equal(KINDS.http_ws, "REAL");
     assert.equal(KINDS.websocket_attach, "REAL");
     assert.equal(KINDS.onion_circuit_layering, "REAL");
     assert.equal(KINDS.hybrid_pqc_handshake, "REAL");
     assert.equal(KINDS.rendezvous_join, "REAL");
+  });
+
+  it("does not claim HTTPS/TLS on this process", () => {
+    assert.equal(KINDS.https_tls, "SLOT");
+    assert.equal(KINDS.https_ws, "SLOT");
+    assert.match(LIMITATION, /not TLS/i);
+    assert.doesNotMatch(LIMITATION, /HTTPS\/WS, encrypted/);
   });
 
   it("labels kernel VPN and public Tor SLOT", () => {
@@ -33,5 +40,6 @@ describe("honesty matrix", () => {
     assert.ok(banner.claims_refused.includes("untraceable proven"));
     assert.ok(banner.residuals.every((r) => r.residual === "NOT_QUANTUM_PROOF"));
     assert.equal(banner.lumen.private_canon_in_this_repo, false);
+    assert.equal(banner.transport.tls, false);
   });
 });

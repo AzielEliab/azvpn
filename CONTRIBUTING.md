@@ -6,7 +6,9 @@ Forks are welcome and always allowed (Apache-2.0).
 
 ## Rules
 
-- Keep REAL vs SLOT labels honest. Do not mark WireGuard, public Tor, or origin-hiding as REAL.
+- Keep REAL vs SLOT labels honest. Do not mark WireGuard, public Tor, origin-hiding, or HTTPS/TLS on this lab `listen()` as REAL.
+- Do not claim HTTPS on the plain HTTP/WS lab server.
+- Default bind is loopback. Non-loopback requires explicit opt-in plus a bearer token.
 - Do not add latency theater (fake ping, fake jitter).
 - Do not claim “untraceable proven.”
 - Keep `NOT_QUANTUM_PROOF` residuals labeled on the hybrid handshake.

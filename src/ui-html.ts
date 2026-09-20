@@ -38,9 +38,10 @@ export function uiHtml(): string {
     <h1>${NAME}</h1>
     <p class="motto">${MOTTO}</p>
     <div class="badges">
-      <span class="badge REAL">HTTPS/WS REAL</span>
+      <span class="badge REAL">HTTP/WS lab REAL</span>
       <span class="badge REAL">onion layering REAL</span>
       <span class="badge REAL">hybrid PQC REAL</span>
+      <span class="badge SLOT">HTTPS/TLS SLOT</span>
       <span class="badge SLOT">WireGuard SLOT</span>
       <span class="badge SLOT">public Tor SLOT</span>
       <span class="badge SLOT">origin-hiding SLOT</span>
@@ -59,10 +60,12 @@ export function uiHtml(): string {
           <input id="peer" value="alice" />
           <label for="mode">Mode</label>
           <select id="mode">
-            <option value="https_ws">https_ws (direct concentrator)</option>
+            <option value="http_ws">http_ws (lab concentrator, not TLS)</option>
             <option value="onion" selected>onion (entry → middle → exit)</option>
             <option value="rendezvous">rendezvous (entry → middle → rend)</option>
           </select>
+          <label for="token">Bearer token (required off-loopback)</label>
+          <input id="token" placeholder="loopback needs none" autocomplete="off" />
           <label for="text">Message</label>
           <textarea id="text" rows="3">hello from AZVPN</textarea>
           <button id="connect">Connect</button>
@@ -84,16 +87,25 @@ export function uiHtml(): string {
     </section>
   </main>
   <footer>
-    Standalone public product. Lumen stays private. No latency theater. No “untraceable proven.”
+    Standalone public product. Lumen stays private. This UI is HTTP/WS lab, not TLS. Loopback default. No latency theater. No “untraceable proven.”
   </footer>
   <script>
     let sessionId = null;
     const out = document.getElementById("out");
     const status = document.getElementById("status");
+    const q = new URLSearchParams(location.search);
+    const tokenBox = document.getElementById("token");
+    if (q.get("token") && tokenBox && !tokenBox.value) tokenBox.value = q.get("token");
+    function headers() {
+      const h = { "content-type": "application/json", "user-agent": "Mozilla/5.0" };
+      const t = tokenBox && tokenBox.value.trim();
+      if (t) h["x-azvpn-token"] = t;
+      return h;
+    }
     async function call(op, body = {}) {
       const res = await fetch("/v1/" + op, {
         method: op === "health" || op === "doctor" || op === "limitation" || op === "skill" ? "GET" : "POST",
-        headers: { "content-type": "application/json", "user-agent": "Mozilla/5.0" },
+        headers: headers(),
         body: (op === "health" || op === "doctor" || op === "limitation" || op === "skill") ? undefined : JSON.stringify(body)
       });
       return res.json();

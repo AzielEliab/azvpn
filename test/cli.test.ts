@@ -26,6 +26,11 @@ describe("CLI", () => {
     const help = await capture(() => main(["help"]));
     assert.equal(help.code, 0);
     assert.match(help.stdout, /SLOT/);
+    assert.match(help.stdout, /HTTP\/WS lab/);
+    assert.match(help.stdout, /expose-non-loopback/);
+    const refused = await capture(() => main(["serve", "--host", "0.0.0.0"]));
+    assert.equal(refused.code, 2);
+    assert.match(refused.stdout, /AZVPN-BIND-REFUSED/);
     const dir = mkdtempSync(join(tmpdir(), "azvpn-"));
     const state = join(dir, "state.json");
     writeFileSync(state, "");

@@ -11,7 +11,7 @@ export const GITHUB = "https://github.com/AzielEliab/azvpn" as const;
 export type Honesty = "REAL" | "SLOT";
 export type Residual = "NOT_QUANTUM_PROOF";
 
-export type SessionMode = "https_ws" | "onion" | "rendezvous";
+export type SessionMode = "http_ws" | "onion" | "rendezvous";
 export type HopRole = "entry" | "middle" | "exit" | "rendezvous";
 
 export type LiveOp =
@@ -47,7 +47,9 @@ export type StubOp =
   | "origin_hiding";
 
 export type KindLabel =
+  | "http_ws"
   | "https_ws"
+  | "https_tls"
   | "fraggate_envelopes"
   | "websocket_attach"
   | "onion_circuit_layering"

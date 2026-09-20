@@ -11,7 +11,7 @@ Standalone public Softwares product. Sister private Lumen may adapter-pair later
 
 ## What this is
 
-An application-layer **HTTPS/WebSocket concentrator** plus an **in-process onion router**.
+An application-layer **HTTP/WS lab concentrator** (Node `http` + `ws`, **not TLS**) plus an **in-process onion router**.
 
 - `open` / `send` / `recv` / `close` allocate session-scoped encrypted envelopes and a peer table.
 - Optional `attach` mints a WebSocket ticket for the same inbox (not a second door).
@@ -22,7 +22,8 @@ An application-layer **HTTPS/WebSocket concentrator** plus an **in-process onion
 
 | Kind | Label |
 |------|--------|
-| https_ws | **REAL** |
+| http_ws (this `listen()`) | **REAL** |
+| https_ws / https_tls (this process) | **SLOT** |
 | fraggate_envelopes | **REAL** |
 | websocket_attach | **REAL** |
 | onion_circuit_layering | **REAL** |
@@ -33,9 +34,13 @@ An application-layer **HTTPS/WebSocket concentrator** plus an **in-process onion
 | public Tor directory / consensus / exit | **SLOT** |
 | origin_hiding | **SLOT** |
 
-`tor` as a public-network op **refuses**. `open --mode onion` is the REAL circuit path.
+`tor` as a public-network op **refuses**. `open --mode onion` is the REAL circuit path. `open --mode https_ws` is accepted as an alias and opens `http_ws` (lab); it does not start TLS.
 
-No claim of “untraceable proven.” Layered peel is not origin-hiding.
+No claim of “untraceable proven.” Layered peel is not origin-hiding. This repo does not claim HTTPS on plain HTTP.
+
+## Bind
+
+Default listen host is `127.0.0.1`. Non-loopback requires `--expose-non-loopback` **and** a bearer token ≥16 characters (`--token` / `AZVPN_TOKEN`), or the process **refuses** (`AZVPN-BIND-REFUSED` / `AZVPN-AUTH-REQUIRED`). Off-loopback HTTP has no TLS; unauthenticated exposure is refused.
 
 ## Handshake (designed hybrid PQC)
 
@@ -50,7 +55,7 @@ X25519-only is refused (`AZVPN-NOT-QUANTUM-PROOF`).
 ### NOT_QUANTUM_PROOF residuals (kept)
 
 - X25519 alone is Shor-broken; it is never the sole secret.
-- HTTPS/TLS and WebSocket inherit the host stack. This repo does not claim PQ-TLS.
+- This process is plain HTTP/WS. HTTPS/TLS is SLOT. Catalog aziel-runtime `https_ws` is a neighbor, not this listen().
 - XChaCha20-Poly1305 is Grover-reduced, not a QKD proof. Random 24-byte nonces are used because RFC-8439 12-byte nonces are collision-unsafe.
 - Metadata remains: hop roster, sizes, timing.
 

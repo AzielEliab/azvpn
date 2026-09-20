@@ -1,9 +1,32 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { BindPolicyError } from "../src/bind.js";
 import { AzvpnEngine } from "../src/engine.js";
 import { listen } from "../src/server.js";
 
 describe("HTTP/WS concentrator", () => {
+  it("refuses non-loopback listen without opt-in and token", async () => {
+    await assert.rejects(
+      () => listen({ host: "0.0.0.0", port: 0, engine: new AzvpnEngine() }),
+      (err: unknown) => err instanceof BindPolicyError && err.code === "AZVPN-BIND-REFUSED",
+    );
+    await assert.rejects(
+      () => listen({ host: "0.0.0.0", port: 0, exposeNonLoopback: true, engine: new AzvpnEngine() }),
+      (err: unknown) => err instanceof BindPolicyError && err.code === "AZVPN-AUTH-REQUIRED",
+    );
+  });
+
+  it("requires bearer token when a token is configured", async () => {
+    const token = "loopback-token-16";
+    const srv = await listen({ host: "127.0.0.1", port: 0, engine: new AzvpnEngine(), token });
+    const base = `http://127.0.0.1:${srv.port}`;
+    const denied = await fetch(`${base}/v1/health`);
+    assert.equal(denied.status, 401);
+    const ok = await fetch(`${base}/v1/health`, { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(ok.status, 200);
+    await srv.close();
+  });
+
   it("serves UI, health, open, and refuses SLOT", async () => {
     const engine = new AzvpnEngine();
     const srv = await listen({ host: "127.0.0.1", port: 0, engine });

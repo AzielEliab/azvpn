@@ -34,11 +34,12 @@ export interface EngineOptions {
 export type EngineResult = Record<string, unknown>;
 
 function asMode(value: unknown): SessionMode {
-  if (value === "onion" || value === "rendezvous" || value === "https_ws") return value;
+  if (value === "onion" || value === "rendezvous" || value === "http_ws") return value;
+  if (value === "https_ws") return "http_ws";
   if (value === "tor") {
     throw Object.assign(new Error("SLOT"), { code: "AZVPN-SLOT", op: "tor" });
   }
-  return "https_ws";
+  return "http_ws";
 }
 
 export class AzvpnEngine {
@@ -150,17 +151,21 @@ export class AzvpnEngine {
   }
 
   describe(payload: Record<string, unknown>): EngineResult {
-    const kind = typeof payload.kind === "string" ? payload.kind : "https_ws";
+    const kind = typeof payload.kind === "string" ? payload.kind : "http_ws";
     const banner = honestyBanner();
+    const mapped = kind === "https_ws" ? "http_ws" : kind;
     return {
       ok: true,
       op: "describe",
-      kind,
-      honesty: (banner.kinds as Record<string, string>)[kind] ?? "SLOT",
+      kind: mapped,
+      requested: kind,
+      honesty: (banner.kinds as Record<string, string>)[kind] ?? (banner.kinds as Record<string, string>)[mapped] ?? "SLOT",
+      tls: false,
       peer: typeof payload.peer === "string" ? payload.peer : null,
-      concentrator: "https_ws",
+      concentrator: "http_ws",
       onion: "in-process layered circuits",
       public_tor: "SLOT",
+      https_tls: "SLOT",
       note: LIMITATION,
     };
   }
@@ -183,7 +188,7 @@ export class AzvpnEngine {
     const cookie = typeof payload.cookie === "string" ? payload.cookie : undefined;
     const session_id = id("sess");
     const hs = hybridHandshake(generateHopIdentity(`session.${session_id}`));
-    const circuit = mode === "https_ws" ? undefined : buildCircuit(this.roster, mode, cookie);
+    const circuit = mode === "http_ws" ? undefined : buildCircuit(this.roster, mode, cookie);
     if (circuit?.rendezvous_cookie) {
       const set = this.rendezvous.get(circuit.rendezvous_cookie) ?? new Set<string>();
       set.add(session_id);
@@ -209,7 +214,8 @@ export class AzvpnEngine {
       mode,
       handshake: hs.handshake,
       residuals: hs.residuals,
-      circuit: circuit ? circuitStatus(circuit) : { shape: "direct https_ws", honesty: "REAL" },
+      circuit: circuit ? circuitStatus(circuit) : { shape: "direct http_ws (lab)", honesty: "REAL", tls: false },
+      transport: { lab: "http_ws", tls: false, https_tls: "SLOT" },
       receipt: {
         session_id,
         opened_at: record.opened_at,
@@ -217,8 +223,8 @@ export class AzvpnEngine {
         identity: IDENTITY,
       },
       note:
-        mode === "https_ws"
-          ? "Application-layer HTTPS/WS session opened. Not a kernel VPN."
+        mode === "http_ws"
+          ? "Application-layer HTTP/WS lab session opened. Not TLS. Not a kernel VPN."
           : "Onion circuit built in-process. Public Tor / origin-hiding stay SLOT. Not untraceable proven.",
     };
   }
@@ -246,7 +252,7 @@ export class AzvpnEngine {
       opened_at: rec.opened_at,
       closed: rec.closed,
       inbox: rec.inbox.length,
-      circuit: rec.circuit ? circuitStatus(rec.circuit) : { shape: "direct https_ws", honesty: "REAL" },
+      circuit: rec.circuit ? circuitStatus(rec.circuit) : { shape: "direct http_ws (lab)", honesty: "REAL", tls: false },
       attach_ticket: rec.attach_ticket ?? null,
     };
   }
@@ -262,7 +268,7 @@ export class AzvpnEngine {
         mode: s.mode,
         opened_at: s.opened_at,
         closed: s.closed,
-        shape: s.circuit ? circuitStatus(s.circuit).shape : "direct https_ws",
+        shape: s.circuit ? circuitStatus(s.circuit).shape : "direct http_ws (lab)",
       })),
     };
   }
@@ -393,7 +399,7 @@ export class AzvpnEngine {
       op: "circuit",
       honesty: "REAL",
       session_id: rec.session_id,
-      circuit: rec.circuit ? circuitStatus(rec.circuit) : { shape: "direct https_ws", honesty: "REAL" },
+      circuit: rec.circuit ? circuitStatus(rec.circuit) : { shape: "direct http_ws (lab)", honesty: "REAL", tls: false },
       residuals: honestyBanner().residuals,
     };
   }

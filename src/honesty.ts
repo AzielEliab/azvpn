@@ -45,7 +45,9 @@ export const STUB_OPS: readonly StubOp[] = [
 ];
 
 export const KINDS: Record<KindLabel, Honesty> = {
-  https_ws: "REAL",
+  http_ws: "REAL",
+  https_ws: "SLOT",
+  https_tls: "SLOT",
   fraggate_envelopes: "REAL",
   websocket_attach: "REAL",
   onion_circuit_layering: "REAL",
@@ -68,7 +70,7 @@ export const NOT_QUANTUM_PROOF: readonly { residual: Residual; note: string }[] 
   },
   {
     residual: "NOT_QUANTUM_PROOF",
-    note: "HTTPS/TLS and WebSocket framing inherit the host stack. This repo does not claim PQ-TLS.",
+    note: "This process serves plain HTTP/WS lab (Node http + ws). It does not terminate TLS. HTTPS/TLS is SLOT here. Catalog aziel-runtime https_ws is a neighbor Worker, not this listen().",
   },
   {
     residual: "NOT_QUANTUM_PROOF",
@@ -83,7 +85,7 @@ export const NOT_QUANTUM_PROOF: readonly { residual: Residual; note: string }[] 
 export const MOTTO = "App-layer envelopes and onion peel are REAL. Kernel VPN and public Tor stay SLOT.";
 
 export const LIMITATION =
-  "THIS IS: AZVPN (AZVPN-CONCENTRATOR-1.0 + AZVPN-ONION-1.0) — a standalone application-layer HTTPS/WebSocket concentrator plus in-process multi-hop onion circuits (entry → middle → exit / rendezvous) with a designed hybrid PQC handshake (X25519 + ML-KEM-768). HTTPS/WS, encrypted envelopes, WS attach, onion layering, and local rendezvous join are REAL. THIS IS NOT: a WireGuard/OpenVPN/L3 kernel UDP concentrator, a public Tor directory/exit, SOCKS, origin-hiding fabric, or an untraceable proof. Those stay SLOT and refuse. NOT_QUANTUM_PROOF residuals stay labeled. No latency theater. Sister private Lumen may adapter-pair later; this repo is standalone and holds no Lumen canon. Author: Aziel Eliab only.";
+  "THIS IS: AZVPN (AZVPN-CONCENTRATOR-1.0 + AZVPN-ONION-1.0) — a standalone application-layer HTTP/WS lab concentrator (plain Node http + ws, not TLS) plus in-process multi-hop onion circuits (entry → middle → exit / rendezvous) with a designed hybrid PQC handshake (X25519 + ML-KEM-768). HTTP/WS lab, encrypted envelopes, WS attach, onion layering, and local rendezvous join are REAL. Bind defaults to 127.0.0.1. THIS IS NOT: HTTPS/TLS termination, a WireGuard/OpenVPN/L3 kernel UDP concentrator, a public Tor directory/exit, SOCKS, origin-hiding fabric, or an untraceable proof. Those stay SLOT and refuse. Non-loopback listen requires --expose-non-loopback plus a bearer token or it refuses. NOT_QUANTUM_PROOF residuals stay labeled. No latency theater. Sister private Lumen may adapter-pair later; this repo is standalone and holds no Lumen canon. Author: Aziel Eliab only.";
 
 export const SLOT_NOTES: Record<StubOp, string> = {
   wireguard: "WireGuard UDP is SLOT. This process is not a kernel VPN concentrator.",
@@ -124,8 +126,18 @@ export function honestyBanner() {
     live_ops: [...LIVE_OPS],
     stub_ops: [...STUB_OPS],
     kinds: { ...KINDS },
+    transport: {
+      lab: "http_ws",
+      honesty: KINDS.http_ws,
+      tls: false,
+      https_tls: KINDS.https_tls,
+      https_ws_catalog_name: KINDS.https_ws,
+      note: "https_ws is a FragGate catalog kind name. This process is HTTP/WS lab, not TLS.",
+    },
     honesty: {
+      http_ws: KINDS.http_ws,
       https_ws: KINDS.https_ws,
+      https_tls: KINDS.https_tls,
       fraggate_envelopes: KINDS.fraggate_envelopes,
       websocket_attach: KINDS.websocket_attach,
       onion_circuit_layering: KINDS.onion_circuit_layering,

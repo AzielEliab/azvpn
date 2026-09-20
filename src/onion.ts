@@ -58,7 +58,7 @@ export function selectHops(roster: HopIdentity[], mode: SessionMode): { role: Ho
     if (!identity) throw new Error("AZVPN-MISSING-HOP");
     return { role, identity };
   };
-  if (mode === "https_ws") return [];
+  if (mode === "http_ws") return [];
   if (mode === "rendezvous") {
     return [
       need("entry.azvpn.local", "entry"),
@@ -129,17 +129,17 @@ export function circuitStatus(circuit: OnionCircuit): CircuitStatus {
     handshake: "hybrid-x25519-mlkem768",
     honesty: "REAL",
   }));
-  const shape = hops.length ? hops.map((h) => h.role).join(" → ") : "direct https_ws";
+  const shape = hops.length ? hops.map((h) => h.role).join(" → ") : "direct http_ws (lab)";
   return {
     circuit_id: circuit.circuit_id,
     mode: circuit.mode,
     hops,
     shape,
     rendezvous_cookie: circuit.rendezvous_cookie,
-    honesty: circuit.mode === "https_ws" ? "REAL" : "REAL",
+    honesty: "REAL",
     note:
-      circuit.mode === "https_ws"
-        ? "Direct concentrator session. No onion hops."
+      circuit.mode === "http_ws"
+        ? "Direct HTTP/WS lab session. Not TLS. No onion hops."
         : "In-process layered circuit. Public Tor directory / origin-hiding stay SLOT. Not untraceable proven.",
   };
 }
