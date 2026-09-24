@@ -37,6 +37,7 @@
     "docs",
     "LICENSE",
     "README.md",
+    "RUN.txt",
     "SKILL.md"
   ],
   "engines": {

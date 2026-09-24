@@ -1,0 +1,9 @@
+AZVPN
+
+1. npm install
+2. npx tsx src/cli.ts ui
+3. Open http://127.0.0.1:8787/
+
+Author: Aziel Eliab
+Machines: add --json to a command.
+Lab TLS and off-machine listen: azvpn help advanced

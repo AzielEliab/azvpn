@@ -20,15 +20,22 @@ Always send `User-Agent: Mozilla/5.0`.
 ## Local
 
 ```bash
-npx tsx src/cli.ts health
-npx tsx src/cli.ts open --peer alice --mode onion
-npx tsx src/cli.ts serve
-npx tsx src/cli.ts cert --dir ./lab-tls
-npx tsx src/cli.ts serve --tls --tls-cert ./lab-tls/cert.pem --tls-key ./lab-tls/key.pem
+npm install
+npx tsx src/cli.ts ui
 ```
 
-`serve` binds 127.0.0.1. Non-loopback needs `--expose-non-loopback` and `--token`.
-`--tls` without cert/key fail-closes.
+Open http://127.0.0.1:8787/
+
+```bash
+npx tsx src/cli.ts health
+npx tsx src/cli.ts open --peer alice --mode onion
+npx tsx src/cli.ts cert --dir ./lab-tls
+npx tsx src/cli.ts ui --tls --tls-cert ./lab-tls/cert.pem --tls-key ./lab-tls/key.pem
+```
+
+`ui` binds 127.0.0.1. People get a short welcome and `--help`. Programs add `--json`.
+Non-loopback needs `--expose-non-loopback` and `--token` (`azvpn help advanced`).
+`--tls` without cert and key fail-closes.
 
 ## Catalog (neighbor, not this repo)
 
