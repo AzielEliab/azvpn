@@ -60,6 +60,7 @@ export interface ServeOptions {
   tls?: boolean;
   tlsCert?: string;
   tlsKey?: string;
+  onChange?: () => void;
 }
 
 function attachHandler(
@@ -67,6 +68,7 @@ function attachHandler(
   engine: AzvpnEngine,
   policy: BindPolicy,
   tlsOn: boolean,
+  onChange?: () => void,
 ): void {
   server.on("request", async (req: IncomingMessage, res: ServerResponse) => {
     const proto = tlsOn ? "https" : "http";
@@ -108,6 +110,7 @@ function attachHandler(
       }
     }
     const result = engine.dispatch(op, payload);
+    if (req.method === "POST") onChange?.();
     json(res, result.ok === false ? 400 : 200, result);
   });
 
@@ -178,7 +181,7 @@ export function createAzvpnServer(opts: ServeOptions = {}) {
   const server = tls.enabled
     ? createHttpsServer({ cert: tls.cert, key: tls.key })
     : createHttpServer();
-  attachHandler(server, engine, policy, tls.enabled);
+  attachHandler(server, engine, policy, tls.enabled, opts.onChange);
   return { server, engine, policy, tls };
 }
 

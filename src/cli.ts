@@ -2,9 +2,10 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BindPolicyError, DEFAULT_BIND, DEFAULT_PORT } from "./bind.js";
+import { ensurePath, rotatePath } from "./boot.js";
 import { AzvpnEngine } from "./engine.js";
-import { withState } from "./persist.js";
-import { helpAdvancedText, helpText, present, welcomeJson, welcomeText } from "./present.js";
+import { saveEngine, withState } from "./persist.js";
+import { helpAdvancedText, helpText, present, presentBoot, welcomeJson } from "./present.js";
 import { listen } from "./server.js";
 import { envFlag, TlsPolicyError, writeLabCertificate } from "./tls.js";
 import { VERSION } from "./types.js";
@@ -98,9 +99,22 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 0;
   }
   if (!op) {
-    if (asJson) printJson(welcomeJson());
-    else process.stdout.write(welcomeText());
-    return 0;
+    const boot = withState(statePath(argv), (engine) => ensurePath(engine));
+    if (asJson) {
+      if (boot.ok === false) printJson(boot);
+      else printJson(welcomeJson());
+    } else {
+      process.stdout.write(presentBoot(boot));
+    }
+    return boot.ok === false ? 2 : 0;
+  }
+  if (op === "rotate") {
+    const result = withState(statePath(argv), (engine) =>
+      rotatePath(engine, { mode: arg(argv, "--mode"), peer: arg(argv, "--peer") }),
+    );
+    if (asJson) printJson(result);
+    else process.stdout.write(presentBoot(result, true));
+    return result.ok === false ? 2 : 0;
   }
   if (op === "cert") {
     const dir = resolve(arg(argv, "--dir", process.env.AZVPN_TLS_DIR ?? "./lab-tls")!);
@@ -139,7 +153,12 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const tls = flag(argv, "--tls") || envFlag(process.env.AZVPN_TLS);
     const tlsCert = arg(argv, "--tls-cert", process.env.AZVPN_TLS_CERT);
     const tlsKey = arg(argv, "--tls-key", process.env.AZVPN_TLS_KEY);
-    const engine = withState(statePath(argv), (e) => e);
+    const path = statePath(argv);
+    let boot: Record<string, unknown> = { ok: false, note: "The path did not come up." };
+    const engine = withState(path, (current) => {
+      boot = ensurePath(current);
+      return current;
+    });
     try {
       const listened = await listen({
         host,
@@ -150,9 +169,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         tls,
         tlsCert,
         tlsKey,
+        onChange: () => saveEngine(path, engine),
       });
       const scheme = listened.tls.enabled ? "https" : "http";
       process.stdout.write(`Open ${scheme}://${host}:${listened.port}/\n`);
+      process.stdout.write(boot.ok === false ? `AZVPN is repairing. ${String(boot.note ?? "")}\n` : "AZVPN is on.\n");
       if (listened.policy.danger) process.stdout.write(`${listened.policy.danger}\n`);
       const stop = async () => {
         await listened.close();
@@ -195,6 +216,20 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const result = new AzvpnEngine().dispatch("classical_only");
     emit(asJson, "classical_only", result);
     return 2;
+  }
+
+  if (op === "close" && !asJson) {
+    const retired = withState(statePath(argv), (engine) => {
+      const closed = engine.dispatch("close", payload);
+      if (closed.ok === false) return closed;
+      return ensurePath(engine);
+    });
+    if (retired.ok === false) {
+      process.stdout.write(present("close", retired, { hadId: Boolean(id) }));
+      return 2;
+    }
+    process.stdout.write(presentBoot(retired));
+    return 0;
   }
 
   const result = withState(statePath(argv), (engine) => engine.dispatch(op, payload));

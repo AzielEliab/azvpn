@@ -51,8 +51,8 @@ npx tsx src/cli.ts cert --dir ./lab-tls
 npx tsx src/cli.ts ui --tls --tls-cert ./lab-tls/cert.pem --tls-key ./lab-tls/key.pem
 \`\`\`
 
-Open http://127.0.0.1:8787/ after \`ui\`. Default bind is loopback HTTP.
-\`--json\` keeps the machine result. \`--tls\` without cert/key fail-closes. ACME is SLOT.
+Open http://127.0.0.1:8787/ after \`ui\`. The path comes up with \`ui\`. Rotate with \`azvpn rotate\`.
+Default bind is loopback HTTP. \`--json\` keeps the machine result. \`--tls\` without cert/key fail-closes. ACME is SLOT.
 
 FragGate catalog slug remains \`${PRODUCT}\` on aziel-runtime. This repo is the standalone public product.
 

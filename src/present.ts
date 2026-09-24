@@ -20,34 +20,29 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 export function helpText(): string {
-  return `${NAME} ${VERSION} — open a lab session on this computer
+  return `${NAME} ${VERSION} — the path comes up on its own
 
 Usage:
   azvpn <command> [options]
 
 Common commands:
-  ui        Start the local page on 127.0.0.1
+  ui        Open rotate and settings on 127.0.0.1
+  rotate    Build a new circuit; AZVPN stays on
   health    Show whether this process is ready
-  open      Open a session with a peer
-  status    Show one session
-  send      Send a message on a session
-  recv      Read messages waiting on a session
-  close     Close a session
+  status    Show the current path
   doctor    Show what is working on this machine
 
 Examples:
+  azvpn
   azvpn ui
-  azvpn open --peer alice --mode onion
-  azvpn send --id SESSION --text hello
+  azvpn rotate
   azvpn --json health
 
 Options:
   --json           Print machine JSON
   --state PATH     State file (default ./.azvpn-state.json)
-  --peer NAME      Peer name
   --mode MODE      http_ws, onion, or rendezvous
   --id SESSION     Session id
-  --text MSG       Message text
   -h, --help       Show this help
   --version        Show version
 
@@ -64,6 +59,10 @@ export function helpAdvancedText(): string {
 Commands:
   list         List sessions
   peers        List open peers
+  open         Open another session record
+  send         Send a message on a session
+  recv         Read messages waiting on a session
+  close        Retire one session record; the path comes back on azvpn and azvpn ui
   attach       Make a WebSocket attach ticket
   circuit      Show the circuit for a session
   cert         Write a lab certificate
@@ -101,27 +100,37 @@ Author: ${AUTHOR}
 `;
 }
 
-export function welcomeText(): string {
-  return `${NAME} opens a lab session on this computer so you can send a message over local HTTP, with onion hops in this process when you ask for them.
-
-Next: start the local page.
-
-  azvpn ui
-
-Also: azvpn health    azvpn doctor    azvpn --help
-
-Author: ${AUTHOR}
-`;
-}
-
 export function welcomeJson(): Record<string, unknown> {
   return {
     ok: true,
     name: NAME,
     version: VERSION,
     author: AUTHOR,
-    next: ["azvpn ui", "azvpn health", "azvpn doctor", "azvpn --help"],
+    next: ["azvpn ui", "azvpn rotate", "azvpn doctor", "azvpn --help"],
   };
+}
+
+export function presentBoot(result: Record<string, unknown>, rebuilt = false): string {
+  if (result.ok === false) {
+    const note = text(result.note) ?? "The path did not come up.";
+    return `${NAME} is repairing.
+  ${note}
+
+Next: azvpn rotate
+`;
+  }
+  const shape = circuitShape(result.circuit) ?? text(result.mode) ?? "";
+  const id = text(result.session_id) ?? "";
+  const headline = rebuilt ? `${NAME} is on. Path rebuilt.` : `${NAME} is on.`;
+  return `${headline}
+  path  ${shape}
+  id    ${id}
+
+Next: azvpn rotate
+      azvpn ui
+
+Author: ${AUTHOR}
+`;
 }
 
 function text(value: unknown): string | undefined {

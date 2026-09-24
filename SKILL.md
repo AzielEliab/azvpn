@@ -33,7 +33,8 @@ npx tsx src/cli.ts cert --dir ./lab-tls
 npx tsx src/cli.ts ui --tls --tls-cert ./lab-tls/cert.pem --tls-key ./lab-tls/key.pem
 ```
 
-`ui` binds 127.0.0.1. People get a short welcome and `--help`. Programs add `--json`.
+`ui` binds 127.0.0.1 and brings the path up. The page rotates the circuit. Settings are under Advanced.
+People see a short status. Programs add `--json`.
 Non-loopback needs `--expose-non-loopback` and `--token` (`azvpn help advanced`).
 `--tls` without cert and key fail-closes.
 

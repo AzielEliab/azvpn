@@ -1,6 +1,6 @@
 # AZVPN
 
-AZVPN opens a lab session on your computer so you can send a message over local HTTP, with onion hops in this process when you ask for them.
+AZVPN comes up on its own. The local page rotates the circuit and holds settings. The path stays on.
 
 **Author:** Aziel Eliab  
 **License:** [Apache-2.0](LICENSE)  
@@ -17,18 +17,19 @@ Open http://127.0.0.1:8787/
 
 Add `--json` to any command when a program needs the machine result.
 
+The page primary action is **Rotate IP**. Settings are under Advanced.
+
 ## Everyday commands
 
 ```bash
+npx tsx src/cli.ts
+npx tsx src/cli.ts rotate
 npx tsx src/cli.ts health
-npx tsx src/cli.ts open --peer alice --mode onion
-npx tsx src/cli.ts send --id sess_… --text hello
-npx tsx src/cli.ts recv --id sess_…
 npx tsx src/cli.ts doctor
 npx tsx src/cli.ts --help
 ```
 
-Lab TLS, certificates, and listening off this machine are under `azvpn help advanced`.
+Lab TLS, certificates, and listening beyond this machine are under `azvpn help advanced`.
 
 State file: `./.azvpn-state.json` (`--state` or `AZVPN_STATE`). Treat it as local secrets.
 
