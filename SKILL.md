@@ -30,6 +30,14 @@ npx tsx src/cli.ts serve --tls --tls-cert ./lab-tls/cert.pem --tls-key ./lab-tls
 `serve` binds 127.0.0.1. Non-loopback needs `--expose-non-loopback` and `--token`.
 `--tls` without cert/key fail-closes.
 
+## Download tracker
+
+Source: `workers/download-tracker` (deploy is separate).
+Worker name: `azvpn-download-tracker`.
+After deploy: `https://azvpn-download-tracker.vibelock.workers.dev/download`
+Archive: `azvpn-0.1.0.tar.gz` (package.json version). Counts are per
+owner, repo, branch, and fork. `/v1` does not increment downloads.
+
 ## Catalog (neighbor, not this repo)
 
 - Pull: `https://aziel-runtime.vibelock.workers.dev/v1/pull/azvpn`

@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "description": "AZVPN download tracker landing. Serves the 0.1.0 source archive and counts downloads per owner, repo, branch, and fork.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "check": "wrangler check"
+  },
+  "devDependencies": {
+    "wrangler": "^4.45.0"
+  }
+}

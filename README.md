@@ -35,6 +35,16 @@ repo is standalone and holds **no Lumen canon**.
 FragGate catalog `https_ws` on aziel-runtime is a **neighbor Worker**, not this
 lab server. This tree claims HTTPS **only** when Node TLS actually terminates.
 
+## Download
+
+Landing source: [`workers/download-tracker`](workers/download-tracker).
+Worker name: `azvpn-download-tracker`. A teammate deploys it after merge.
+Expected route: `https://azvpn-download-tracker.vibelock.workers.dev/`.
+
+`GET /download` returns `azvpn-0.1.0.tar.gz` (this tree, package.json
+**0.1.0**) with HTTP 200. GitHub Releases has no asset. Counts are stored
+per owner, repo, branch, and fork. `/v1` does not increment downloads.
+
 `NOT_QUANTUM_PROOF` residuals stay labeled (host metadata, Grover AEAD, HN-DR,
 wipe side-channel). No latency theater.
 
@@ -115,8 +125,9 @@ azvpn.dispatch("open", { peer: "alice", mode: "onion" });
 FragGate slug `azvpn` on [aziel-runtime](https://github.com/AzielEliab/aziel-runtime)
 remains the in-runtime concentrator cite (`AZVPN-CONCENTRATOR-1.0`). This
 repository is the **standalone** public product (GitHub
-https://github.com/AzielEliab/azvpn). No product Worker hostname is invented
-here.
+https://github.com/AzielEliab/azvpn). The download landing Worker name is
+`azvpn-download-tracker` (source in this tree; deploy is separate). Catalog
+`https_ws` on aziel-runtime stays a neighbor.
 
 Always send `User-Agent: Mozilla/5.0` when calling hosted catalog routes.
 

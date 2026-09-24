@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.wrangler/
 .azvpn-state.json
 lab-tls/
 *.log
