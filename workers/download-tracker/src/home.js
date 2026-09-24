@@ -289,6 +289,7 @@ function breakdownList(stats) {
 export function renderHome(stats) {
   const downloads = Number(stats.downloads != null ? stats.downloads : stats.total) || 0;
   const n = downloads.toLocaleString("en-US");
+  const downloadWord = downloads === 1 ? "download" : "downloads";
   const gh = stats.github || {};
   const releaseAssets = Number(gh.release_asset_count) || 0;
   return `<!doctype html>
@@ -346,7 +347,7 @@ export function renderHome(stats) {
       </section>
       <section class="section" aria-labelledby="count-heading">
         <h2 id="count-heading">Counted downloads</h2>
-        <p class="countline">${escapeHtml(n)} downloads on this Worker, summed across branches and forks.</p>
+        <p class="countline">${escapeHtml(n)} ${downloadWord} on this Worker, summed across branches and forks.</p>
         <p class="quiet">Archive ${escapeHtml(DEFAULT_ASSET)}. Version ${VERSION} is the version in package.json. GitHub Releases lists ${escapeHtml(releaseAssets)} assets. Stars ${escapeHtml(gh.stars || 0)} · forks ${escapeHtml(gh.forks || 0)}.</p>
         <pre id="install-cmd">curl -fsSL -A 'Mozilla/5.0' ${HOST}/install.sh | bash</pre>
         <details>
