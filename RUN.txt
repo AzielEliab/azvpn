@@ -1,0 +1,10 @@
+AZVPN
+
+1. npm install
+2. npx tsx src/cli.ts ui
+3. Open http://127.0.0.1:8787/
+
+The path is already up. Rotate IP is the primary action. Settings are under Advanced.
+Author: Aziel Eliab
+Machines: add --json to a command.
+Lab TLS and listening beyond this machine: azvpn help advanced
