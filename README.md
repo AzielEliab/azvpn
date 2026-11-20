@@ -19,6 +19,15 @@ Add `--json` to any command when a program needs the machine result.
 
 The page primary action is **Rotate IP**. Settings are under Advanced.
 
+## Download
+
+Counted archive: `azvpn-0.1.0.tar.gz` (this tree at package.json **0.1.0**), served with HTTP 200. GitHub Releases has no asset.
+
+- Download: https://azvpn-download-tracker.vibelock.workers.dev/download
+- Stats: https://azvpn-download-tracker.vibelock.workers.dev/stats
+
+Worker name: `azvpn-download-tracker`. Source: [`workers/download-tracker`](workers/download-tracker). The tracker goes live when it is deployed to Cloudflare. This repository does not deploy it. Counts are stored per owner, repo, branch, and fork. `/v1` and `/mcp` do not increment.
+
 ## Everyday commands
 
 ```bash
