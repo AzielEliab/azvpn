@@ -38,6 +38,15 @@ People see a short status. Programs add `--json`.
 Non-loopback needs `--expose-non-loopback` and `--token` (`azvpn help advanced`).
 `--tls` without cert and key fail-closes.
 
+## Download tracker
+
+Source: `workers/download-tracker`. This repository does not deploy it.
+Worker name: `azvpn-download-tracker`. It goes live when deployed to Cloudflare.
+Download: `https://azvpn-download-tracker.vibelock.workers.dev/download`
+Stats: `https://azvpn-download-tracker.vibelock.workers.dev/stats`
+Archive: `azvpn-0.1.0.tar.gz` (package.json version). Counts are per
+owner, repo, branch, and fork. `/v1` and `/mcp` do not increment.
+
 ## Catalog (neighbor, not this repo)
 
 - Pull: `https://aziel-runtime.vibelock.workers.dev/v1/pull/azvpn`
